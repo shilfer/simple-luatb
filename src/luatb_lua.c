@@ -36,6 +36,8 @@ static int luatb_lua_type_signalhandle_finalizer(lua_State *L)
 static void luatb_lua_type_signalhandle_initial(lua_State *L)
 {
     luaL_newmetatable(L, LUATB_SIGNALHANDLE_TYPENAME);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index"); // metatable.__index = metatable
     lua_pushcfunction(L, luatb_lua_type_signalhandle_finalizer);
     lua_setfield(L, -2, "__gc");
     lua_pop(L, 1);
@@ -78,6 +80,7 @@ static int luatb_lua_libvpi_func_stop_sim(lua_State *L)
 /*
 VPI库函数：信号操作
 vpi.get_signal_handle_by_path(path) -> SignalHandle
+vpi.get_signal_path(handle) -> string
 vpi.get_signal_value_binstr(handle) -> string
 vpi.set_signal_value_binstr(handle, binstr [,delay]) -> string
 vpi.force_signal_value_binstr(handle, binstr) -> string
@@ -104,7 +107,45 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
         luaL_pushfail(L);
         return 1;
     }
-    luatb_lua_type_signalhandle_newobj(L, signal_handle, path);
+    // 判断handle的类型
+    PLI_INT32 handle_type = vpi_get(vpiType, signal_handle);
+    if (VS_TYPE_IS_VHDL(handle_type)) {
+        luatb_info_error("VHDL object not supported");
+        luaL_pushfail(L);
+        return 1;
+    }
+    vpiHandle index_handle;
+    PLI_INT32 array_size;
+    switch(handle_type) {
+        case vpiNet:
+        case vpiReg:
+        case vpiPort:
+            luatb_lua_type_signalhandle_newobj(L, signal_handle, path);
+            return 1;
+        case vpiNetArray:
+        case vpiRegArray:
+            // 获取array的大小
+            array_size = vpi_get(vpiSize, signal_handle);
+            lua_newtable(L);
+            for (PLI_INT32 idx = 0; idx < array_size; idx++) {
+                index_handle = vpi_handle_by_index(signal_handle, idx);
+                lua_pushfstring(L, "%s[%d]", path, idx);
+                luatb_lua_type_signalhandle_newobj(L, index_handle, lua_tostring(L, -1));
+                lua_seti(L, -3, idx+1);     // lua的table的下标从1开始
+                lua_pop(L, 1);
+            }
+            return 1;
+        default:
+            luatb_info_error("object type %d not supported", handle_type);
+            luaL_pushfail(L);      
+            return 1;
+    }
+}
+
+static int luatb_lua_libvpi_func_get_signal_path(lua_State *L)
+{
+    luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
+    lua_getiuservalue(L, 1, 1);
     return 1;
 }
 
@@ -450,6 +491,7 @@ const luaL_Reg luatb_lua_libvpi_funcs[] = {
     {"stop_sim", luatb_lua_libvpi_func_stop_sim},
     // 信号操作函数
     {"get_signal_handle_by_path", luatb_lua_libvpi_func_get_signal_handle_by_path},
+    {"get_signal_path", luatb_lua_libvpi_func_get_signal_path},
     {"get_signal_value_binstr", luatb_lua_libvpi_func_get_signal_value_binstr},
     {"set_signal_value_binstr", luatb_lua_libvpi_func_set_signal_value_binstr},
     {"force_signal_value_binstr", luatb_lua_libvpi_func_force_signal_value_binstr},

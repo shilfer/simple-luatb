@@ -11,8 +11,8 @@
 #include "lua/lauxlib.h"
 
 #include "vpi/vpi_user.h"
-#include "vpi/vpi_vhdl.h"
 #include "vpi/sv_vpi_user.h"
+#include "vpi/acc_vhdl.h"
 
 #define LUATB_SIGNALHANDLE_TYPENAME "SignalHandle"
 
