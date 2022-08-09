@@ -114,8 +114,11 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
         luaL_pushfail(L);
         return 1;
     }
-    vpiHandle index_handle;
-    PLI_INT32 array_size;
+    vpiHandle array_handle, left_rng_handle, right_rng_handle;
+    PLI_INT32 array_size, index_base;
+    s_vpi_value left_range, right_range;
+    size_t root_path_len = strlen(vpi_get_str(vpiFullName, root));
+    char* object_path;
     switch(handle_type) {
         case vpiNet:
         case vpiReg:
@@ -126,13 +129,23 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
         case vpiRegArray:
             // 获取array的大小
             array_size = vpi_get(vpiSize, signal_handle);
+            left_rng_handle = vpi_handle(vpiLeftRange, signal_handle);
+            right_rng_handle = vpi_handle(vpiRightRange, signal_handle);
+            left_range.format = vpiIntVal;
+            right_range.format = vpiIntVal;
+            vpi_get_value(left_rng_handle, &left_range);
+            vpi_get_value(right_rng_handle, &right_range);
+            if (left_range.value.integer <= right_range.value.integer) {
+                index_base = left_range.value.integer;
+            } else {
+                index_base = right_range.value.integer;
+            }
             lua_newtable(L);
             for (PLI_INT32 idx = 0; idx < array_size; idx++) {
-                index_handle = vpi_handle_by_index(signal_handle, idx);
-                lua_pushfstring(L, "%s[%d]", path, idx);
-                luatb_lua_type_signalhandle_newobj(L, index_handle, lua_tostring(L, -1));
-                lua_seti(L, -3, idx+1);     // lua的table的下标从1开始
-                lua_pop(L, 1);
+                array_handle = vpi_handle_by_index(signal_handle, idx+index_base);
+                object_path = vpi_get_str(vpiFullName, array_handle);
+                luatb_lua_type_signalhandle_newobj(L, array_handle, object_path+root_path_len+1);
+                lua_seti(L, -2, luaL_len(L, -2)+1); 
             }
             return 1;
         default:
