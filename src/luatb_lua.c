@@ -166,11 +166,7 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
 static int luatb_lua_libvpi_func_get_signal_path(lua_State *L)
 {
     luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
-    int st = lua_getiuservalue(L, 1, 1);
-    if (st == LUA_TNONE) {
-        lua_pushstring(L, "failed to get upvalue of userdata");
-        return 2;
-    }    
+    lua_getiuservalue(L, 1, 1);
     return 1;
 }
 
@@ -178,13 +174,15 @@ static int luatb_lua_libvpi_func_get_signal_value_binstr(lua_State *L)
 {
     vpiHandle *p_signal = luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
     vpiHandle signal = *p_signal;
+    lua_getiuservalue(L, 1, 1);
+    char* signal_path = strdup(lua_tostring(L, -1));
+    lua_pop(L, 1);
     if (signal == NULL)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to get handle to signal %s", lua_tostring(L, -1));
-        lua_pop(L, 1);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring("failed to get handle to signal %s", signal_path);
+        free(signal_path);
+        return 2;
     }
     s_vpi_value value;
     s_vpi_error_info error;
@@ -194,13 +192,13 @@ static int luatb_lua_libvpi_func_get_signal_value_binstr(lua_State *L)
     error_code = vpi_chk_error(&error);
     if (error_code != 0)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to get value of signal %s:\n\t%s", lua_tostring(L, -1), error.message);
-        lua_pop(L, 1);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring("failed to get value of signal %s:\n\t%s", signal_path, error.message);
+        free(signal_path);
+        return 2;
     }
     lua_pushstring(L, value.value.str);
+    free(signal_path);
     return 1;
 }
 
