@@ -46,6 +46,7 @@ struct T_LUATB_CALLBACK_CONTEXT {
 
 // VPI函数：获取仿真时间
 PLI_UINT64 luatb_vpi_get_sim_time();
+PLI_INT32  luatb_vpi_get_time_unit();
 // VPI函数：仿真结束回调
 PLI_INT32  luatb_vpi_end_of_sim_callback(p_cb_data);
 // VPI函数：luatb_start系统函数的compiletf

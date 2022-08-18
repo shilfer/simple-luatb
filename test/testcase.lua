@@ -3,9 +3,20 @@ print("In Script testcase.lua")
 storage = {}
 storage.clk_value = "0"
 
-clk = vpi.get_signal_handle_by_path("clk")
-rstn = vpi.get_signal_handle_by_path("rstn")
-out = vpi.get_signal_handle_by_path("out")
+clk, err = vpi.get_signal_handle_by_path("clk")
+if not clk then
+    error(err)
+end
+
+rstn, err = vpi.get_signal_handle_by_path("rstn")
+if not rstn then
+    error(err)
+end
+
+out, err = vpi.get_signal_handle_by_path("out")
+if not out then
+    error(err)
+end
 
 for i,v in ipairs(out) do
     print(i, v, vpi.get_signal_path(v))
@@ -26,3 +37,5 @@ vpi.register_callback_on_simtime_interval(
     end,
     100000, storage
 )
+
+print(vpi.get_timeunit())

@@ -16,6 +16,12 @@ PLI_UINT64 luatb_vpi_get_sim_time()
     return time_value;
 }
 
+PLI_INT32 luatb_vpi_get_time_unit()
+{
+    PLI_INT32 tu = vpi_get(vpiTimeUnit, NULL);
+    return tu;
+}
+
 PLI_INT32 luatb_vpi_end_of_sim_callback(p_cb_data cb_data)
 {
     p_luatb_rtenv rtenv = (p_luatb_rtenv)cb_data->user_data;

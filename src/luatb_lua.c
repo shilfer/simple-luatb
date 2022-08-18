@@ -7,6 +7,7 @@ static int luatb_lua_global_print(lua_State *L)
 {
     int n = lua_gettop(L); /* number of arguments */
     int i;
+    vpi_printf("[script:I:%llu] ", luatb_vpi_get_sim_time());
     for (i = 1; i <= n; i++) { /* for each argument */
         size_t l;
         const char *s = luaL_tolstring(L, i, &l); /* convert it to string */
@@ -55,6 +56,7 @@ static void luatb_lua_type_signalhandle_newobj(lua_State *L, vpiHandle signal, c
 /*
 VPI库函数：仿真控制
 vpi.get_simtime() -> integer
+vpi.get_timeunit() -> number
 vpi.finish_sim() -> void
 vpi.stop_sim() -> void
 */
@@ -62,6 +64,12 @@ static int luatb_lua_libvpi_func_get_simtime(lua_State *L)
 {
     lua_Unsigned t = luatb_vpi_get_sim_time();
     lua_pushinteger(L, t);
+    return 1;
+}
+
+static int luatb_lua_libvpi_func_get_timeunit(lua_State* L)
+{
+    lua_pushinteger(L, luatb_vpi_get_time_unit());
     return 1;
 }
 
@@ -79,12 +87,12 @@ static int luatb_lua_libvpi_func_stop_sim(lua_State *L)
 
 /*
 VPI库函数：信号操作
-vpi.get_signal_handle_by_path(path) -> SignalHandle
-vpi.get_signal_path(handle) -> string
-vpi.get_signal_value_binstr(handle) -> string
-vpi.set_signal_value_binstr(handle, binstr [,delay]) -> string
-vpi.force_signal_value_binstr(handle, binstr) -> string
-vpi.release_signal_force(handle); -> string
+vpi.get_signal_handle_by_path(path) -> SignalHandle|table(SignalHandle)|nil,error
+vpi.get_signal_path(handle) -> string|nil,error
+vpi.get_signal_value_binstr(handle) -> string|nil,error
+vpi.set_signal_value_binstr(handle, binstr [,delay]) -> string|nil,error
+vpi.force_signal_value_binstr(handle, binstr) -> string|nil,error
+vpi.release_signal_force(handle); -> string|nil,error
 */
 static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
 {
@@ -92,9 +100,9 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
     p_luatb_rtenv* p_rtenv = lua_getextraspace(L);
     p_luatb_rtenv rtenv = *p_rtenv;
     if (rtenv == NULL) {
-        luatb_info_error("failed to get luatb runtime environment");
         luaL_pushfail(L);
-        return 1;
+        lua_pushstring(L, "failed to get luatb runtime environment");
+        return 2;
     }
     const char *path = luaL_checkstring(L, 1);
     vpiHandle root = rtenv->UUT;
@@ -103,16 +111,16 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
     {
         s_vpi_error_info error;
         vpi_chk_error(&error);
-        luatb_info_error("failed to get handle to signal %s:\n\t%s", path, error.message);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring(L, "failed to get handle to signal %s:\n\t%s", path, error.message);
+        return 2;
     }
     // 判断handle的类型
     PLI_INT32 handle_type = vpi_get(vpiType, signal_handle);
     if (VS_TYPE_IS_VHDL(handle_type)) {
-        luatb_info_error("VHDL object not supported");
         luaL_pushfail(L);
-        return 1;
+        lua_pushstring(L, "VHDL object not supported");
+        return 2;
     }
     vpiHandle array_handle, left_rng_handle, right_rng_handle;
     PLI_INT32 array_size, index_base;
@@ -149,16 +157,20 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
             }
             return 1;
         default:
-            luatb_info_error("object type %d not supported", handle_type);
-            luaL_pushfail(L);      
-            return 1;
+            luaL_pushfail(L);
+            lua_pushfstring(L, "object type %d not supported", handle_type);
+            return 2;
     }
 }
 
 static int luatb_lua_libvpi_func_get_signal_path(lua_State *L)
 {
     luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
-    lua_getiuservalue(L, 1, 1);
+    int st = lua_getiuservalue(L, 1, 1);
+    if (st == LUA_TNONE) {
+        lua_pushstring(L, "failed to get upvalue of userdata");
+        return 2;
+    }    
     return 1;
 }
 
@@ -500,6 +512,7 @@ VPI库函数注册
 const luaL_Reg luatb_lua_libvpi_funcs[] = {
     // 仿真控制函数
     {"get_simtime", luatb_lua_libvpi_func_get_simtime},
+    {"get_timeunit", luatb_lua_libvpi_func_get_timeunit},
     {"finish_sim", luatb_lua_libvpi_func_finish_sim},
     {"stop_sim", luatb_lua_libvpi_func_stop_sim},
     // 信号操作函数
