@@ -112,7 +112,7 @@ static int luatb_lua_libvpi_func_get_signal_handle_by_path(lua_State *L)
         s_vpi_error_info error;
         vpi_chk_error(&error);
         luaL_pushfail(L);
-        lua_pushfstring(L, "failed to get handle to signal %s:\n\t%s", path, error.message);
+        lua_pushfstring(L, "failed to get handle to signal %s: %s", path, error.message);
         return 2;
     }
     // 判断handle的类型
@@ -193,7 +193,7 @@ static int luatb_lua_libvpi_func_get_signal_value_binstr(lua_State *L)
     if (error_code != 0)
     {
         luaL_pushfail(L);
-        lua_pushfstring("failed to get value of signal %s:\n\t%s", signal_path, error.message);
+        lua_pushfstring("failed to get value of signal %s: %s", signal_path, error.message);
         free(signal_path);
         return 2;
     }
@@ -208,13 +208,15 @@ static int luatb_lua_libvpi_func_set_signal_value_binstr(lua_State *L)
     const char *binstr = luaL_checkstring(L, 2);
     lua_Integer delay = luaL_optinteger(L, 3, 0);
     vpiHandle signal = *p_signal;
+    lua_getiuservalue(L, 1, 1);
+    char* signal_path = strdup(lua_tostring(L, -1));
+    lua_pop(L, 1);
     if (signal == NULL)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to get handle to signal %s", lua_tostring(L, -1));
-        lua_pop(L, 1);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring("failed to get handle to signal %s", signal_path);
+        free(signal_path);
+        return 2;
     }
     s_vpi_value value;
     value.format = vpiBinStrVal;
@@ -229,16 +231,16 @@ static int luatb_lua_libvpi_func_set_signal_value_binstr(lua_State *L)
     error_code = vpi_chk_error(&error);
     if (error_code != 0)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to set value %s to signal %s:\n\t%s", binstr, lua_tostring(L, -1), error.message);
-        lua_pop(L, 1);
         luaL_pushfail(L);
+        lua_pushfstring("failed to set value %s to signal %s: %s", binstr, signal_path, error.message);
+        free(signal_path);
         vpi_release_handle(ev_handle);
-        return 1;
+        return 2;
     }
     // 返回设置的字符串
     lua_pushstring(L, binstr);
     vpi_release_handle(ev_handle);
+    free(signal_path);
     return 1;
 }
 
@@ -247,13 +249,15 @@ static int luatb_lua_libvpi_func_force_signal_value_binstr(lua_State *L)
     vpiHandle *p_signal = luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
     const char *binstr = luaL_checkstring(L, 2);
     vpiHandle signal = *p_signal;
+    lua_getiuservalue(L, 1, 1);
+    char* signal_path = strdup(lua_tostring(L, -1));
+    lua_pop(L, 1);
     if (signal == NULL)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to get handle to signal %s", lua_tostring(L, -1));
-        lua_pop(L, 1);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring("failed to get handle to signal %s", signal_path);
+        free(signal_path);
+        return 2;
     }
     s_vpi_value value;
     value.format = vpiBinStrVal;
@@ -263,17 +267,17 @@ static int luatb_lua_libvpi_func_force_signal_value_binstr(lua_State *L)
     vpiHandle ev_handle = vpi_put_value(signal, &value, NULL, vpiForceFlag);
     error_code = vpi_chk_error(&error);
     if (error_code != 0)
-    {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to force signal %s to value %s:\n\t%s", lua_tostring(L, -1), binstr, error.message);
-        lua_pop(L, 1);
+    {        
         luaL_pushfail(L);
+        lua_pushfstring("failed to force value %s to signal %s: %s", binstr, signal_path, error.message);
+        free(signal_path);
         vpi_release_handle(ev_handle);
-        return 1;
+        return 2;
     }
     // 返回设置的字符串
     lua_pushstring(L, binstr);
     vpi_release_handle(ev_handle);
+    free(signal_path);
     return 1;
 }
 
@@ -281,13 +285,15 @@ static int luatb_lua_libvpi_func_release_signal_force(lua_State *L)
 {
     vpiHandle *p_signal = luaL_checkudata(L, 1, LUATB_SIGNALHANDLE_TYPENAME);
     vpiHandle signal = *p_signal;
+    lua_getiuservalue(L, 1, 1);
+    char* signal_path = strdup(lua_tostring(L, -1));
+    lua_pop(L, 1);
     if (signal == NULL)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to get handle to signal %s", lua_tostring(L, -1));
-        lua_pop(L, 1);
         luaL_pushfail(L);
-        return 1;
+        lua_pushfstring("failed to get handle to signal %s", signal_path);
+        free(signal_path);
+        return 2;
     }
     s_vpi_value value;
     value.format = vpiBinStrVal;
@@ -297,23 +303,23 @@ static int luatb_lua_libvpi_func_release_signal_force(lua_State *L)
     error_code = vpi_chk_error(&error);
     if (error_code != 0)
     {
-        lua_getiuservalue(L, 1, 1);
-        luatb_info_error("failed to release force for signal %s:\n\t%s", lua_tostring(L, -1), error.message);
-        lua_pop(L, 1);
         luaL_pushfail(L);
+        lua_pushfstring(L, "failed to release signal %s: %s", signal_path, error.message);
+        free(signal_path);
         vpi_release_handle(ev_handle);
-        return 1;
+        return 2;
     }
     // 返回release之后信号的值
     lua_pushstring(L, value.value.str);
     vpi_release_handle(ev_handle);
+    free(signal_path);
     return 1;
 }
 /*
 VPI库函数：回调
-vpi.register_callback_on_simtime_when(func, time, data) -> status
-vpi.register_callback_on_simtime_interval(func, intv, data) -> status
-vpi.register_callback_on_signal_change(func, handle, data) -> status
+vpi.register_callback_on_simtime_when(func, time, data) -> status,error
+vpi.register_callback_on_simtime_interval(func, intv, data) -> status,error
+vpi.register_callback_on_signal_change(func, handle, data) -> status,error
 */
 static int luatb_lua_libvpi_func_register_callback_on_simtime_when(lua_State* L)
 {
@@ -325,9 +331,9 @@ static int luatb_lua_libvpi_func_register_callback_on_simtime_when(lua_State* L)
     lua_Unsigned now_time = luatb_vpi_get_sim_time();
     lua_Unsigned set_time = time;
     if (time <= 0 || set_time <= now_time) {
-        luatb_info_error("failed to register callback: time<=0 or time<=current simtime");
         luaL_pushfail(L);
-        return 1;
+        lua_pushstring(L, "failed to register callback: time<=0 or time<=current simtime");
+        return 2;
     }
 
     p_luatb_cbctx cbctx = (p_luatb_cbctx)malloc(sizeof(s_luatb_cbctx));
@@ -362,10 +368,10 @@ static int luatb_lua_libvpi_func_register_callback_on_simtime_when(lua_State* L)
     vpiHandle cb_handle = vpi_register_cb(&cb_data);
     s_vpi_error_info error;
     if (vpi_chk_error(&error) != 0) {
-        luatb_info_error("failed to register callback: \n\t%s", error.message);
         luaL_pushfail(L);
+        lua_pushfstring(L, "failed to register callback: %s", error.message);
         free(cbctx);
-        return 1;
+        return 2;
     }
     vpi_release_handle(cb_handle);
     // 将cbctx值保存起来
@@ -387,9 +393,9 @@ static int luatb_lua_libvpi_func_register_callback_on_simtime_interval(lua_State
     luaL_checktype(L, 3, LUA_TTABLE);
 
     if (intv <= 0) {
-        luatb_info_error("failed to register callback: intv<=0");
         luaL_pushfail(L);
-        return 1;
+        lua_pushstring(L, "failed to register callback: intv<=0");
+        return 2;
     }
 
     p_luatb_cbctx cbctx = (p_luatb_cbctx)malloc(sizeof(s_luatb_cbctx));
@@ -424,10 +430,10 @@ static int luatb_lua_libvpi_func_register_callback_on_simtime_interval(lua_State
     vpiHandle cb_handle = vpi_register_cb(&cb_data);
     s_vpi_error_info error;
     if (vpi_chk_error(&error) != 0) {
-        luatb_info_error("failed to register callback: \n\t%s", error.message);
         luaL_pushfail(L);
+        lua_pushfstring(L, "failed to register callback: %s", error.message);
         free(cbctx);
-        return 1;
+        return 2;
     }
     vpi_release_handle(cb_handle);
     // 将cbctx值保存起来
@@ -449,9 +455,9 @@ static int luatb_lua_libvpi_func_register_callback_on_signal_change(lua_State* L
     luaL_checktype(L, 3, LUA_TTABLE);
 
     if (*p_signal == NULL) {
-        luatb_info_error("failed to register callback: invalid signal handle");
         luaL_pushfail(L);
-        return 1;
+        lua_pushstring(L, "failed to register callback: invalid signal handle");
+        return 2;
     }
 
     p_luatb_cbctx cbctx = (p_luatb_cbctx)malloc(sizeof(s_luatb_cbctx));
@@ -486,10 +492,10 @@ static int luatb_lua_libvpi_func_register_callback_on_signal_change(lua_State* L
     vpiHandle cb_handle = vpi_register_cb(&cb_data);
     s_vpi_error_info error;
     if (vpi_chk_error(&error) != 0) {
-        luatb_info_error("failed to register callback: \n\t%s", error.message);
         luaL_pushfail(L);
+        lua_pushfstring(L, "failed to register callback: %s", error.message);
         free(cbctx);
-        return 1;
+        return 2;
     }
     vpi_release_handle(cb_handle);
     // 将cbctx值保存起来
